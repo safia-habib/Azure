@@ -33,3 +33,7 @@ Provide the link to the Blob storage container (Containing the installAction.sh)
 Select Head and Worker process for installing agent 
 
 ![](HDInsights_CustomActionScriptSetting.PNG)
+
+Complete the installation by creating the cluster. All the nodes will have the Dynatrace OneAgent installed 
+
+Go to Dynatrace Web UI and the cluster nodes and verify the installation
