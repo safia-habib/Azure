@@ -10,7 +10,7 @@ Select Linux installation and copy the wget URL and install script in a notepad 
 wget  -O Dynatrace-OneAgent-Linux-1.137.163.sh "https://YOURTENANT.live.dynatrace.com/api/v1/deployment/installer/agent/unix/default/latest?Api-Token=YOURAPITOKEN&arch=x86&flavor=default"
  /bin/sh Dynatrace-OneAgent-Linux-1.137.163.sh  APP_LOG_CONTENT_ACCESS=1 
  ```
- Copy this file in a Blob Storage Container and Note the URL
+ Copy this file in a Blob Storage Container and Note the URL -> Make this file publically accessible. By default it is private
 
 **Creating HDInsights cluster through Azure Portal**
 
