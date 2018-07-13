@@ -1,5 +1,7 @@
 # Installing the Dynatrace One Agent on the HDInsight cluster
 
+A full video demonstrating the installation is available here: https://youtu.be/pnT0HBSTFcw
+
 Login to the Dynatrace Console 
 Go to Deploy Dynatrace
 Select Linux installation and copy the wget URL and install script in a notepad (name the file installAction.sh)
