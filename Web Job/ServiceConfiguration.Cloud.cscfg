@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ServiceConfiguration serviceName="Your_CloudServiceWeb" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceConfiguration" osFamily="4" osVersion="*" schemaVersion="2015-04.2.6">
+  <Role name="Your WebRole">
+    <Instances count="1" />
+    <ConfigurationSettings>
+      <Setting name="Dynatrace.EnvironmentID" value="xxxxxx" />
+      <Setting name="Dynatrace.APIToken" value="xxxxxxx" />
+    </ConfigurationSettings>
+  </Role>
+</ServiceConfiguration>
