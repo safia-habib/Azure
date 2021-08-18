@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample
+  labels:
+    app: sample
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: sample
+      labels:
+        app: sample
+    spec:
+      nodeSelector:
+        "kubernetes.io/os": windows
+      containers:
+      - name: sample
+        image: mcr.microsoft.com/dotnet/framework/samples:aspnetapp
+        env:
+#.NET Framework
+          - name: COR_ENABLE_PROFILING
+            value: "0x01"
+          - name: COR_PROFILER
+            value: "{B7038F67-52FC-4DA2-AB02-969B3C1EDA03}"
+          - name: COR_PROFILER_PATH_32
+            value: "C:\\oneagent\\agent\\lib\\oneagentloader.dll"
+          - name: COR_PROFILER_PATH_64
+            value: "C:\\oneagent\\agent\\lib64\\oneagentloader.dll"
+#.NET Core
+          - name: CORECLR_ENABLE_PROFILING
+            value: "0x01"
+          - name: CORECLR_PROFILER
+            value: "{B7038F67-52FC-4DA2-AB02-969B3C1EDA03}"
+          - name: CORECLR_PROFILER_PATH_32
+            value: "C:\\oneagent\\agent\\lib\\oneagentloader.dll"
+          - name: CORECLR_PROFILER_PATH_64
+            value: "C:\\oneagent\\agent\\lib64\\oneagentloader.dll"
+          - name: DT_AGENTACTIVE
+            value: "true"
+          - name: DT_BLACKLIST
+            value: "powershell*"
+        volumeMounts:
+          - mountPath: "C:\\OneAgent"
+            name: oneagent
+# initcontainer to download OneAgent
+      initContainers:
+      - name: install-oneagent
+        image: mcr.microsoft.com/windows/servercore:ltsc2019
+        command:
+        - powershell
+        args:
+          - |
+            Write-Host "Trustng all certificates..."
+            add-type @"
+            using System.Net;
+            using System.Security.Cryptography.X509Certificates;
+            public class TrustAllCertsPolicy : ICertificatePolicy {
+            public bool CheckValidationResult(
+            ServicePoint srvPoint, X509Certificate certificate,
+            WebRequest request, int certificateProblem) {
+            return true;
+            }
+            }
+            "@
+            [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+            Write-Host "Downloading agent..."
+            Invoke-WebRequest -Uri "$Env:DT_API_URL/v1/deployment/installer/agent/windows/paas/latest?Api-Token=$Env:DT_PAAS_TOKEN&$Env:DT_ONEAGENT_OPTIONS" -OutFile "installer.zip"
+            Write-Host "Unpacking agent..."
+            Expand-Archive -Path "installer.zip" -DestinationPath "C:\OneAgent" -Force
+            Write-Host "Configuring agent..."
+            $manifest = Get-Content "C:\OneAgent\manifest.json" | ConvertFrom-Json
+            $config = New-Item -Path "C:\OneAgent\agent\conf" -Name "standalone.conf"
+            Add-Content -Path $config -Value "tenant $($manifest.tenantUUID)"
+            Add-Content -Path $config -Value "tenanttoken $($manifest.tenantToken)"
+            Add-Content -Path $config -Value "server $($manifest.communicationEndpoints -Join ';')"
+            Add-Content -Path $config -Value "storage C:\OneAgent"
+            Add-Content -Path $config -Value "loglevelcon NONE"
+        env:
+        - name: DT_API_URL
+          value: https://<YourDTTenant>.live.dynatrace.com/api
+        - name: DT_PAAS_TOKEN
+          value: <PaaSToken (Dynatrace -> Settings -> Integration -> Platform as a Service Token)
+        - name: DT_ONEAGENT_OPTIONS
+          value: flavor=x86&include=dotnet
+        volumeMounts:
+        - mountPath: "C:\\OneAgent"
+          name: oneagent
+# Make OneAgent available as a volume
+      volumes:
+      - name: oneagent
+        emptyDir: {}
+        
+   selector:
+    matchLabels:
+      app: sample
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample
+spec:
+  type: LoadBalancer
+  ports:
+  - protocol: TCP
+    port: 80
+  selector:
+    app: sample
