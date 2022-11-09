@@ -1,7 +1,7 @@
 apiVersion: v1
 data:
-  apiToken: ZHQwYzAxLk1OV0NXVlEzNk1UR0JSTDNVSklJNU9BSC5IQlVEQjNZWDVUVDdMQ1VPSktaMjM3VTRZQUpPSzZWNlcyVEZVSFZZUVZSUzZSV1JNQzNPSUNQWUgyS1NKMlRN
-  dataIngestToken: ZHQwYzAxLlg0VVZYN1RTWFNBRFZEUERFQ01JT1FXTy40SVBWM1NJVFpPTjMyMlhGSFA0UzVGNVZVUlZJS041RFlLUVhLWURQMlhXT1dOM01USFJaTFZRVFNBWFVFNklT
+  apiToken: 
+  dataIngestToken: 
 kind: Secret
 metadata:
   name: gke-dynatrace-lab
@@ -20,7 +20,7 @@ spec:
   # For SaaS, set `YOUR_ENVIRONMENT_ID` to your environment ID.
   # For Managed, change the apiUrl address.
   # For instructions on how to determine the environment ID and how to configure the apiUrl address, see https://www.dynatrace.com/support/help/reference/dynatrace-concepts/environment-id/.
-  apiUrl: https://qzo69327.live.dynatrace.com/api
+  apiUrl: 
 
   # Optional: name of secret holding `apiToken` and `paasToken`
   # If unset, name of custom resource is used
