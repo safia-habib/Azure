@@ -211,9 +211,9 @@ config:
 
   exporters:
     otlphttp:
-      endpoint: "https://tus35956.live.dynatrace.com/api/v2/otlp"
+      endpoint: "https://TENANTID.live.dynatrace.com/api/v2/otlp"
       headers:
-        Authorization: "Api-Token dt0c01.HPFHIVILF27GDRDQ25AW5FC7.VQL3LLBR4FMDWF4SI2I4BSSC4MDUPD74JEBHZDNSA3FNI3U6CLCNOZHZMHEYICNQ"
+        Authorization: "Api-Token DTXXXXXX"
   extensions:
     health_check: {}
     memory_ballast:
