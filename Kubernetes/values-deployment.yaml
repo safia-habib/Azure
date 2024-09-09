@@ -1,0 +1,245 @@
+mode: daemonset
+image:
+  repository: ghcr.io/dynatrace/dynatrace-otel-collector/dynatrace-otel-collector
+  tag: latest
+command:
+  name: dynatrace-otel-collector
+extraEnvs:
+- name: DT_API_TOKEN
+  valueFrom:
+    secretKeyRef:
+      name: dynatrace-otelcol-dt-api-credentials
+      key: DT_API_TOKEN
+- name: DT_ENDPOINT
+  valueFrom:
+    secretKeyRef:
+      name: dynatrace-otelcol-dt-api-credentials
+      key: DT_ENDPOINT
+resources:
+  limits:
+    memory: 512Mi
+
+
+
+extraEnvs:
+  - name: K8S_CLUSTER_NAME
+    value: CLUSTER_NAME
+  - name: K8S_NODE_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: spec.nodeName
+presets:
+  hostMetrics:
+    enabled: true
+  kubeletMetrics:
+    enabled: false
+  kubernetesAttributes:
+    enabled: true
+  kubernetesEvents:
+    enabled: true    
+clusterRole:
+  create: true
+  name: "opentelemetry-collector-admin"
+  rules:
+  - verbs: ["*"]
+    resources: ["*"]
+    apiGroups: ["*"]
+  - verbs: ["*"]
+    nonResourceURLs: ["*"]
+  clusterRoleBinding:
+    name: "opentelemetry-collector-admin"
+serviceAccount:
+  create: true
+  name: "opentelemetry-collector-admin"
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 127.0.0.1:4317
+          max_recv_msg_size_mib: 4
+        http:
+          endpoint: 127.0.0.1:4318
+    jaeger: null
+    zipkin: null
+    prometheus:
+      config:
+        scrape_configs:
+          - job_name: "prometheus"
+            scrape_interval: 10s
+            kubernetes_sd_configs:
+              - role: pod
+            relabel_configs:
+              - source_labels:
+                  [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+                regex: "true"
+                action: keep
+              - source_labels:
+                  [
+                    __address__,
+                    __meta_kubernetes_pod_annotation_prometheus_io_port,
+                  ]
+                action: replace
+                target_label: __address__
+                regex: ([^:]+)(?::\d+)?;(\d+)
+                replacement: $$1:$$2
+          - job_name: "otel-collector"
+            scrape_interval: 10s
+            static_configs:
+              - targets: ["127.0.0.1:8888"]
+          # Scrape cAdvisor metrics
+          - job_name: integrations/kubernetes/cadvisor
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+            kubernetes_sd_configs:
+                - role: node
+            relabel_configs:
+                - replacement: kubernetes.default.svc.cluster.local:443
+                  target_label: __address__
+                - regex: (.+)
+                  replacement: /api/v1/nodes/$${1}/proxy/metrics/cadvisor
+                  source_labels:
+                    - __meta_kubernetes_node_name
+                  target_label: __metrics_path__
+            scheme: https
+            tls_config:
+                ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                insecure_skip_verify: false
+                server_name: kubernetes
+          - job_name: integrations/kubernetes/kubelet
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+            kubernetes_sd_configs:
+                - role: node
+            relabel_configs:
+                - replacement: kubernetes.default.svc.cluster.local:443
+                  target_label: __address__
+                - regex: (.+)
+                  replacement: /api/v1/nodes/$${1}/proxy/metrics
+                  source_labels:
+                    - __meta_kubernetes_node_name
+                  target_label: __metrics_path__
+            scheme: https
+            tls_config:
+                ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                insecure_skip_verify: false
+                server_name: kubernetes
+          # Scrape config for API servers
+          - job_name: "kubernetes-apiservers"
+            kubernetes_sd_configs:
+              - role: endpoints
+                namespaces:
+                  names:
+                    - default
+            scheme: https
+            tls_config:
+              ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              insecure_skip_verify: true
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+            relabel_configs:
+            - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+              action: keep
+              regex: kubernetes;https
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_namespace
+              target_label: Namespace
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_service_name
+              target_label: Service
+  processors:
+    resourcedetection/system:
+      detectors: [env, system, gcp, eks]
+      timeout: 2s
+      override: false  
+    attributes/metrics:
+      actions:
+        - action: insert
+          key: env.name
+          value: ENV_NAME
+        - action: insert
+          key: cluster
+          value: CLUSTER_NAME                     
+    resource:
+      attributes:
+        - action: insert
+          key: env.name
+          value: ENV_NAME
+        - action: insert
+          key: cluster
+          value: CLUSTER_NAME
+    batch:
+      send_batch_size: 10000
+      timeout: 200ms
+    memory_limiter:
+      check_interval: 3s
+      limit_mib: 1500
+      spike_limit_mib: 500
+    k8sattributes:
+      auth_type: "serviceAccount"
+      passthrough: true
+      filter:
+        node_from_env_var: K8S_NODE_NAME
+      extract:
+        metadata:
+          - k8s.pod.name
+          - k8s.pod.uid
+          - k8s.deployment.name
+          - k8s.container.name
+          - k8s.namespace.name
+          - k8s.node.name
+          - k8s.pod.start_time
+    cumulativetodelta:
+    transform:
+      metric_statements:
+        - context: metric
+          statements:
+            # Get count from the histogram. The new metric name will be <histogram_name>_count
+            - extract_count_metric(true) where type == METRIC_DATA_TYPE_HISTOGRAM
+
+            # Get sum from the histogram. The new metric name will be <histogram_name>_sum
+            - extract_sum_metric(true) where type == METRIC_DATA_TYPE_HISTOGRAM
+        - context: datapoint
+          statements:
+            # convert the <histogram_name>_sum metrics to gauges.
+            - convert_sum_to_gauge() where IsMatch(metric.name, ".*_sum")
+
+    filter:
+      metrics:
+        metric:
+          # Drop metrics of type histogram. The _count and _sum metrics will still be exported.
+          - type == METRIC_DATA_TYPE_HISTOGRAM
+
+  exporters:
+    otlphttp:
+      endpoint: "https://TENANTID.live.dynatrace.com/api/v2/otlp"
+      headers:
+        Authorization: "Api-Token DTXXXXXX"
+  extensions:
+    health_check: {}
+    memory_ballast:
+      size_mib: 683
+  service:
+    extensions: [memory_ballast, health_check]
+    telemetry:
+      metrics:
+        address: 127.0.0.1:8888
+      logs:
+        encoding: json
+    pipelines:
+      metrics:
+        exporters:
+          - otlphttp
+        processors:
+          - attributes/metrics 
+          - transform
+          - filter
+          - cumulativetodelta
+          - memory_limiter
+          - k8sattributes
+          - resource
+          - batch
+        receivers:
+          - otlp
+          - prometheus
+      traces: null
+      logs: null
