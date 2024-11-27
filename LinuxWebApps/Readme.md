@@ -18,6 +18,7 @@ For Linux App Services / WebApps running Java app use the following guide to ins
    readonly installerWrapperURL=https://raw.githubusercontent.com/dynatrace-oss/cloud-snippets/main/azure/linux-app-service/oneagent-installer.sh
    wget -O $installerWrapperInstallationPath $installerWrapperURL
    DT_ENDPOINT=$DT_ENDPOINT DT_API_TOKEN=$DT_API_TOKEN DT_INCLUDE=$DT_INCLUDE START_APP_CMD=$START_APP_CMD sh $installerWrapperInstallationPath
+   export LD_PRELOAD="/opt/dynatrace/oneagent/agent/lib64/liboneagentproc.so"
    ```
    
 3. Add the Mapping of the Storage Accunt in the web app
